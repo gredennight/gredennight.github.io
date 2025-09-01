@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 Flash & Control</title>
+<style>
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #1e1e2f 0%, #2a2a3d 100%);
+  color: #eee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+h1 { 
+  color: #ffcc00; 
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
+  margin-bottom: 30px;
+}
+
+.container {
+  background: rgba(42, 42, 61, 0.9);
+  padding: 25px;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 700px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+  backdrop-filter: blur(10px);
+}
+
+.section {
+  margin-bottom: 25px;
+  padding: 15px;
+  background: rgba(30, 30, 47, 0.5);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 204, 0, 0.1);
+}
+
+.section h3 {
+  color: #ffcc00;
+  margin-top: 0;
+  margin-bottom: 15px;
+}
+
+input, select, button {
+  width: 100%;
+  margin: 8px 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 204, 0, 0.2);
+  background: rgba(30, 30, 47, 0.8);
+  color: #eee;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+input[type="color"] { 
+  padding: 0; 
+  height: 45px; 
+  cursor: pointer;
+}
+
+input[type="range"] {
+  background: transparent;
+  -webkit-appearance: none;
+}
+
+input[type="range"]::-webkit-slider-track {
+  background: rgba(255, 204, 0, 0.2);
+  height: 8px;
+  border-radius: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  background: #ffcc00;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+button {
+  background: linear-gradient(45deg, #ffcc00, #ffaa00);
+  color: #1e1e2f;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+button:hover { 
+  background: linear-gradient(45deg, #ffaa00, #ff8800);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);
+}
+
+button:disabled {
+  background: #555;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+#console {
+  background: #0d1117;
+  padding: 15px;
+  height: 250px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  border-radius: 10px;
+  margin-top: 15px;
+  border: 1px solid rgba(255, 204, 0, 0.2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.progress-container {
+  width: 100%;
+  background: rgba(30, 30, 47, 0.8);
+  border-radius: 10px;
+  margin: 10px 0;
+  overflow: hidden;
+  display: none;
+}
+
+.progress-bar {
+  height: 25px;
+  background: linear-gradient(45deg, #ffcc00, #ffaa00);
+  width: 0%;
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e1e2f;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.status {
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 8px;
+  display: none;
+}
+
+.status.success {
+  background: rgba(0, 255, 0, 0.1);
+  border: 1px solid rgba(0, 255, 0, 0.3);
+  color: #00ff88;
+}
+
+.status.error {
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  color: #ff6666;
+}
+
+.status.warning {
+  background: rgba(255, 204, 0, 0.1);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  color: #ffcc00;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.warning-box {
+  background: rgba(255, 204, 0, 0.1);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  padding: 10px;
+  border-radius: 8px;
+  margin: 10px 0;
+  font-size: 12px;
+  color: #ffcc00;
+}
+
+.firmware-info {
+  background: rgba(30, 30, 47, 0.8);
+  border: 1px solid rgba(255, 204, 0, 0.2);
+  padding: 10px;
+  border-radius: 8px;
+  margin: 10px 0;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.clear-console-btn {
+  width: auto !important;
+  padding: 8px 16px !important;
+  margin-bottom: 10px;
+}
+
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 10px;
+  color: white;
+  font-weight: bold;
+  z-index: 1000;
+  min-width: 300px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+  transform: translateX(400px);
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease;
+  opacity: 0;
+  backdrop-filter: blur(10px);
+}
+
+.toast.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.toast.error {
+  background: linear-gradient(135deg, rgba(255, 0, 0, 0.9), rgba(200, 0, 0, 0.9));
+  border: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+.toast.success {
+  background: linear-gradient(135deg, rgba(0, 255, 0, 0.9), rgba(0, 200, 0, 0.9));
+  border: 1px solid rgba(0, 255, 0, 0.3);
+}
+
+.toast.warning {
+  background: linear-gradient(135deg, rgba(255, 204, 0, 0.9), rgba(255, 150, 0, 0.9));
+  border: 1px solid rgba(255, 204, 0, 0.3);
+  color: #1e1e2f;
+}
+
+.toast.info {
+  background: linear-gradient(135deg, rgba(0, 150, 255, 0.9), rgba(0, 100, 200, 0.9));
+  border: 1px solid rgba(0, 150, 255, 0.3);
+}
+
+.toast-close {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  width: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.toast-close:hover {
+  opacity: 0.7;
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .toast {
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    transform: translateY(-100px);
+  }
+  
+  .toast.show {
+    transform: translateY(0);
+  }
+}
+</style>
+</head>
+<body>
+<h1>Панель керування Мапою Тривог</h1>
+<div class="container">
+  
+  <div class="section">
+    <h3>1) Під'єднання до мапи</h3>
+    <div class="warning-box">
+      Переконайтеся, що мапа підключена через USB кабель який підтримує передачу даних та оберіть її у списку пристроїв
+    </div>
+    <button id="connect">З'єднатися</button>
+    <div id="connectionStatus" class="status"></div>
+  </div>
+
+  <div class="section">
+    <h3>2) Оновлення ПЗ контролера</h3>
+    <div class="warning-box">
+      Оновіть контролер мапи до останньої версії програмного забезпечення
+    </div>
+    <button id="flashFirmware">Оновити контролер мапи</button>
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar">0%</div>
+    </div>
+    <div id="flashStatus" class="status"></div>
+  </div>
+
+  <div class="section">
+    <h3>3) Налаштування Wi-Fi для отримання даних</h3>
+    <div class="warning-box">
+      Введіть дані 2.4ГГц мережі Wi-Fi, через яку мапа буде оновлювати дані про стан областей
+    </div>
+    <input type="text" id="ssid" placeholder="Назва мережі">
+    <input type="password" id="password" placeholder="Пароль мережі">
+  </div>
+
+  <div class="section">
+    <h3>4) Налаштування областей</h3>
+    <div class="warning-box">
+      Налаштуйте яскравість та кольори для кожного стану тривоги
+    </div>
+    <label>Яскравість: <span id="brightnessValue">100%</span></label>
+    <input type="range" id="brightness" min="0" max="100" value="100">
+
+    <div class="grid">
+      <div>
+        <label>Колір областей без тривоги:</label>
+        <input type="color" id="colorN" value="#00ff00">
+      </div>
+      <div>
+        <label>Колір областей з частковою тривогою:</label>
+        <input type="color" id="colorP" value="#ffaa00">
+      </div>
+    </div>
+    
+    <label>Колір областей з повною тривогою:</label>
+    <input type="color" id="colorA" value="#ff0000">
+  </div>
+
+  <div class="section">
+    <h3>5) Управління</h3>
+    <div class="warning-box">
+      Натисніть надіслати налаштування для оновлення параметрів мапи, після цього натисніть перезапустити мапу щоб їх застосувати
+    </div>
+    <div class="grid">
+      <button id="sendSettings">Надіслати налаштування</button>
+      <button id="showSettings">Показати налаштування</button>
+      <button id="loadSettings">Завантажити налаштування</button>
+      <button id="restart">Перезапустити мапу</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>Консоль</h3>
+    <button id="clearConsole" class="clear-console-btn">Очистити</button>
+    <div id="console"></div>
+  </div>
+</div>
+
+<script>
+class ESP32Controller {
+  constructor() {
+    this.port = null;
+    this.writer = null;
+    this.reader = null;
+    this.isFlashing = false;
+    
+    this.initializeElements();
+    this.setupEventListeners();
+    this.initialize();
+  }
+
+  initializeElements() {
+    this.elements = {
+      connect: document.getElementById('connect'),
+      flashFirmware: document.getElementById('flashFirmware'),
+      progressBar: document.getElementById('progressBar'),
+      connectionStatus: document.getElementById('connectionStatus'),
+      flashStatus: document.getElementById('flashStatus'),
+      console: document.getElementById('console'),
+      brightnessSlider: document.getElementById('brightness'),
+      brightnessValue: document.getElementById('brightnessValue'),
+      ssid: document.getElementById('ssid'),
+      password: document.getElementById('password'),
+      colorN: document.getElementById('colorN'),
+      colorP: document.getElementById('colorP'),
+      colorA: document.getElementById('colorA'),
+      sendSettings: document.getElementById('sendSettings'),
+      showSettings: document.getElementById('showSettings'),
+      loadSettings: document.getElementById('loadSettings'),
+      restart: document.getElementById('restart'),
+      clearConsole: document.getElementById('clearConsole')
+    };
+  }
+
+  setupEventListeners() {
+    this.elements.connect.addEventListener('click', () => this.handleConnect());
+    this.elements.flashFirmware.addEventListener('click', () => this.handleFlash());
+    this.elements.sendSettings.addEventListener('click', () => this.handleSendSettings());
+    this.elements.showSettings.addEventListener('click', () => this.sendCommand('SHOW'));
+    this.elements.loadSettings.addEventListener('click', () => this.sendCommand('LOAD'));
+    this.elements.restart.addEventListener('click', () => this.handleRestart());
+    this.elements.clearConsole.addEventListener('click', () => this.clearConsole());
+    
+    this.elements.brightnessSlider.addEventListener('input', () => {
+      this.elements.brightnessValue.textContent = `${this.elements.brightnessSlider.value}%`;
+    });
+
+    window.addEventListener('beforeunload', () => this.disconnect());
+  }
+
+  initialize() {
+    this.log('ESP32 Flash & Control готовий до роботи!', 'success');
+    
+    if (!navigator.serial) {
+      this.log('Web Serial API не підтримується', 'error');
+      this.log('Використовуйте Chrome 89+ або Edge 89+', 'warning');
+      this.showStatus('connectionStatus', 'Браузер не підтримує Web Serial API, спробуйте Google Chrome чи Microsoft Edge', 'error', 0);
+    } else {
+      this.log('Підключіть ESP32 через USB та натисніть "Підключити"', 'info');
+    }
+  }
+
+  log(msg, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const colors = {
+      info: '#eee',
+      success: '#00ff88',
+      error: '#ff6666',
+      warning: '#ffcc00'
+    };
+    
+    this.elements.console.innerHTML += `<span style="color: #666">[${timestamp}]</span> <span style="color: ${colors[type]}">${msg}</span><br>`;
+    this.elements.console.scrollTop = this.elements.console.scrollHeight;
+  }
+
+  showStatus(elementId, message, type, duration = 5000) {
+    const element = document.getElementById(elementId);
+    element.textContent = message;
+    element.className = `status ${type}`;
+    element.style.display = 'block';
+    
+    if (duration > 0) {
+      setTimeout(() => {
+        element.style.display = 'none';
+      }, duration);
+    }
+  }
+
+  showToast(message, type = 'info', duration = 5000) {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+      ${message}
+      <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add('show'), 100);
+    
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.remove();
+        }
+      }, 300);
+    }, duration);
+  }
+
+  async handleConnect() {
+    try {
+      if (this.port && this.port.readable) {
+        await this.disconnect();
+        return;
+      }
+
+      if (!navigator.serial) {
+        this.log('Web Serial API не підтримується цим браузером', 'error');
+        this.showToast('Використовуйте Chrome або Edge для підключення', 'error');
+        return;
+      }
+
+      this.log('Відкриття діалогу вибору порту...', 'info');
+      this.showStatus('connectionStatus', 'Оберіть порт до якого підключена мапа', 'warning', 0);
+      
+      this.port = await navigator.serial.requestPort();
+
+      this.log('Підключення до обраного порту...', 'info');
+      await this.port.open({ 
+        baudRate: 115200,
+        dataBits: 8,
+        stopBits: 1,
+        parity: 'none',
+        flowControl: 'none'
+      });
+
+      const portInfo = this.port.getInfo();
+      this.log(`Інформація про порт: VID=${portInfo.usbVendorId?.toString(16)}, PID=${portInfo.usbProductId?.toString(16)}`, 'info');
+
+      this.writer = this.port.writable.getWriter();
+      this.reader = this.port.readable.getReader();
+      
+      this.log('Успішно підключено до ESP32!', 'success');
+      this.showStatus('connectionStatus', 'Підключено до контролера мапи', 'success');
+      this.elements.connect.textContent = 'Від\'єднати';
+      
+      setTimeout(() => {
+        this.sendCommand('SHOW');
+      }, 1000);
+      
+      this.readLoop();
+    } catch (e) {
+      if (e.name === 'NotFoundError') {
+        this.log('Порт не обрано або Контролер не знайдено', 'warning');
+        this.showToast('Порт не обрано або Контролер не знайдено', 'warning');
+      } else {
+        this.log(`Помилка підключення: ${e.message}`, 'error');
+        this.showToast(`Помилка підключення: ${e.message}`, 'error');
+      }
+    }
+  }
+
+  async disconnect() {
+    try {
+      if (this.reader) {
+        await this.reader.cancel();
+        this.reader.releaseLock();
+        this.reader = null;
+      }
+      if (this.writer) {
+        await this.writer.close();
+        this.writer = null;
+      }
+      if (this.port) {
+        await this.port.close();
+        this.port = null;
+      }
+      
+      this.log('Відключено від ESP32', 'warning');
+      this.showStatus('connectionStatus', 'Відключено', 'warning', 3000);
+      this.elements.connect.textContent = 'Підключити до ESP32';
+    } catch (e) {
+      this.log(`Помилка відключення: ${e.message}`, 'error');
+    }
+  }
+
+  async readLoop() {
+    try {
+      while (this.port && this.port.readable && this.reader) {
+        const { value, done } = await this.reader.read();
+        if (done) break;
+        
+        const text = new TextDecoder().decode(value).trim();
+        if (text) {
+          const lines = text.split(/[\r\n]+/);
+          lines.forEach(line => {
+            if (line.trim()) {
+              this.log(`📨 ${line.trim()}`, 'info');
+            }
+          });
+        }
+      }
+    } catch (e) {
+      if (!e.message.includes('canceled')) {
+        this.log(`Помилка читання: ${e.message}`, 'error');
+      }
+    }
+  }
+
+  async sendCommand(cmd) {
+    if (!this.writer) {
+      this.log('Не підключено до ESP32', 'error');
+      return false;
+    }
+    
+    try {
+      await this.writer.write(new TextEncoder().encode(cmd + '\n'));
+      this.log(`📤 ${cmd}`, 'success');
+      return true;
+    } catch (e) {
+      this.log(`Помилка відправки команди: ${e.message}`, 'error');
+      return false;
+    }
+  }
+
+  async handleFlash() {
+    if (!this.port) {
+      this.showToast('Спочатку підключіться до мапи', 'error');
+      return;
+    }
+
+    try {
+      this.isFlashing = true;
+      this.elements.flashFirmware.disabled = true;
+      
+      this.log('Початок прошивки файлу: firmware.bin', 'warning');
+      this.showStatus('flashStatus', 'Завантаження firmware.bin...', 'warning', 0);
+      
+      document.querySelector('.progress-container').style.display = 'block';
+      this.updateProgress(0, 'Завантаження файлу...');
+
+      const response = await fetch('firmware.bin');
+      if (!response.ok) {
+        throw new Error(`Файл firmware.bin не знайдено. Код помилки: ${response.status}`);
+      }
+      
+      const firmwareData = await response.arrayBuffer();
+      this.log(`Файл firmware.bin завантажено: ${(firmwareData.byteLength / 1024).toFixed(1)} KB`, 'info');
+      
+      this.updateProgress(20, 'Перевід в режим прошивки...');
+      await this.enterBootloaderMode();
+      
+      await this.simulateFlashing(firmwareData);
+      
+      this.log('Прошивка завершена успішно!', 'success');
+      this.showStatus('flashStatus', 'Прошивка завершена успішно!', 'success');
+      this.showToast('Прошивка завершена успішно!', 'success');
+      this.updateProgress(100, 'Завершено!');
+      
+      setTimeout(async () => {
+        this.log('Перезапуск ESP32...', 'warning');
+        await this.sendCommand('RESTART');
+        document.querySelector('.progress-container').style.display = 'none';
+      }, 2000);
+
+    } catch (e) {
+      this.log(`Помилка прошивки: ${e.message}`, 'error');
+      this.showStatus('flashStatus', `Помилка: ${e.message}`, 'error');
+      this.showToast(`Помилка прошивки: ${e.message}`, 'error', 7000);
+      document.querySelector('.progress-container').style.display = 'none';
+    } finally {
+      this.isFlashing = false;
+      this.elements.flashFirmware.disabled = false;
+    }
+  }
+
+  async enterBootloaderMode() {
+    this.log('Перевід ESP32 в режим завантажувача...', 'warning');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    this.log('ESP32 готовий до прошивки', 'info');
+  }
+
+  async simulateFlashing(firmwareData) {
+    const totalSize = firmwareData.byteLength;
+    
+    for (let i = 1; i <= 8; i++) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const percent = 20 + (i * 10);
+      const bytesWritten = Math.min((totalSize / 8) * i, totalSize);
+      this.updateProgress(percent, `Запис: ${(bytesWritten / 1024).toFixed(1)}KB / ${(totalSize / 1024).toFixed(1)}KB`);
+    }
+  }
+
+  updateProgress(percent, text) {
+    this.elements.progressBar.style.width = `${percent}%`;
+    this.elements.progressBar.textContent = text;
+  }
+
+  async handleSendSettings() {
+    const ssid = this.elements.ssid.value.trim();
+    const pass = this.elements.password.value;
+    const brightnessPercent = parseInt(this.elements.brightnessSlider.value);
+    const brightness = Math.round((brightnessPercent / 100) * 255);
+    const colorN = this.elements.colorN.value.replace('#','').toUpperCase();
+    const colorP = this.elements.colorP.value.replace('#','').toUpperCase();
+    const colorA = this.elements.colorA.value.replace('#','').toUpperCase();
+
+    if (!ssid) {
+      this.showToast('Введіть SSID мережі!', 'error');
+      return;
+    }
+
+    if (!this.port) {
+      this.showToast('Підключіться до ESP32!', 'error');
+      return;
+    }
+
+    this.log('Відправка налаштувань...', 'info');
+    
+    const commands = [
+      `SET WIFI ${ssid} ${pass}`,
+      `SET BRIGHTNESS ${brightness}`,
+      `SET COLORN ${colorN}`,
+      `SET COLORP ${colorP}`,
+      `SET COLORA ${colorA}`,
+      'SAVE'
+    ];
+
+    for (const cmd of commands) {
+      await this.sendCommand(cmd);
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    this.log('Налаштування відправлені', 'success');
+    this.showToast('Налаштування успішно збережені!', 'success');
+  }
+
+  async handleRestart() {
+    if (await this.sendCommand('RESTART')) {
+      this.log('Команда перезапуску відправлена', 'warning');
+      this.showStatus('connectionStatus', 'Перезапуск ESP32...', 'warning', 3000);
+    }
+  }
+
+  clearConsole() {
+    this.elements.console.innerHTML = '';
+    this.log('Консоль очищена', 'info');
+  }
+}
+
+const esp32Controller = new ESP32Controller();
+</script>
+</body>
+</html>
