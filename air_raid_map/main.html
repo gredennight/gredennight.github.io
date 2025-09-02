@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESP32 Flash & Control</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@9.3.0/dist/web/install-button.js?module"></script>
 <style>
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -112,7 +113,7 @@ button:disabled {
 #console {
   background: #0d1117;
   padding: 15px;
-  height: 250px;
+  height: 200px;
   overflow-y: auto;
   font-family: 'Courier New', monospace;
   border-radius: 10px;
@@ -122,16 +123,16 @@ button:disabled {
   line-height: 1.4;
 }
 
-.progress-container {
+.flash-progress {
   width: 100%;
   background: rgba(30, 30, 47, 0.8);
   border-radius: 10px;
-  margin: 10px 0;
+  margin: 15px 0;
   overflow: hidden;
   display: none;
 }
 
-.progress-bar {
+.flash-progress-bar {
   height: 25px;
   background: linear-gradient(45deg, #ffcc00, #ffaa00);
   width: 0%;
@@ -183,16 +184,6 @@ button:disabled {
   margin: 10px 0;
   font-size: 12px;
   color: #ffcc00;
-}
-
-.firmware-info {
-  background: rgba(30, 30, 47, 0.8);
-  border: 1px solid rgba(255, 204, 0, 0.2);
-  padding: 10px;
-  border-radius: 8px;
-  margin: 10px 0;
-  font-size: 13px;
-  font-family: monospace;
 }
 
 .clear-console-btn {
@@ -262,6 +253,38 @@ button:disabled {
   opacity: 0.7;
 }
 
+/* ESP Web Tools Button Styling */
+esp-web-install-button {
+  --esp-tools-button-color: #1e1e2f;
+  --esp-tools-button-background: linear-gradient(45deg, #ffcc00, #ffaa00);
+  --esp-tools-button-border-radius: 10px;
+  --esp-tools-button-font-weight: bold;
+  --esp-tools-button-text-transform: uppercase;
+  --esp-tools-button-letter-spacing: 1px;
+  width: 100%;
+  margin: 8px 0;
+}
+
+esp-web-install-button::part(button) {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 204, 0, 0.2);
+  background: linear-gradient(45deg, #ffcc00, #ffaa00);
+  color: #1e1e2f;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+esp-web-install-button::part(button):hover {
+  background: linear-gradient(45deg, #ffaa00, #ff8800);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(255, 204, 0, 0.3);
+}
+
 @media (max-width: 600px) {
   .grid {
     grid-template-columns: 1fr;
@@ -285,24 +308,29 @@ button:disabled {
 <div class="container">
   
   <div class="section">
-    <h3>1) Під'єднання до мапи</h3>
+    <h3>1) Оновлення ПЗ контролера</h3>
     <div class="warning-box">
-      Переконайтеся, що мапа підключена через USB кабель який підтримує передачу даних та оберіть її у списку пристроїв
+      Оновіть контролер мапи до останньої версії програмного забезпечення.
+      Для цього спочатку підключіть мапу кабелем для передачі даних до комп'ютера. 
+      На зворотній стороні мапи знайдіть контролер, затисніть малу кнопку яка знаходиться поряд з червоним світлодіодом.
+      На сторінці натисність Прошити контролер мапи, оберіть порт, натисніть Install AirRaidMap, натисність Install та дочекайтеся завершення процесу. Після цього можете відпустити кнопку на контролері.
     </div>
-    <button id="connect">З'єднатися</button>
-    <div id="connectionStatus" class="status"></div>
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">Прошити контролер мапи</button>
+    </esp-web-install-button>
+    <div class="flash-progress">
+      <div class="flash-progress-bar" id="flashProgressBar">0%</div>
+    </div>
+    <div id="flashStatus" class="status"></div>
   </div>
 
   <div class="section">
-    <h3>2) Оновлення ПЗ контролера</h3>
+    <h3>2) Під'єднання до мапи</h3>
     <div class="warning-box">
-      Оновіть контролер мапи до останньої версії програмного забезпечення
+      Для налаштувань мапи необхідно підключитися до неї. Для цього з'єднайте мапу кабелем для передачі даних з комп'ютером та натисніть Підключитися до контролера, оберіть необхідний порт.
     </div>
-    <button id="flashFirmware">Оновити контролер мапи</button>
-    <div class="progress-container">
-      <div class="progress-bar" id="progressBar">0%</div>
-    </div>
-    <div id="flashStatus" class="status"></div>
+    <button id="connect">Підключитися до контролера</button>
+    <div id="connectionStatus" class="status"></div>
   </div>
 
   <div class="section">
@@ -338,7 +366,7 @@ button:disabled {
   </div>
 
   <div class="section">
-    <h3>5) Управління</h3>
+    <h3>5) Керування</h3>
     <div class="warning-box">
       Натисніть надіслати налаштування для оновлення параметрів мапи, після цього натисніть перезапустити мапу щоб їх застосувати
     </div>
@@ -363,18 +391,17 @@ class ESP32Controller {
     this.port = null;
     this.writer = null;
     this.reader = null;
-    this.isFlashing = false;
     
     this.initializeElements();
     this.setupEventListeners();
+    this.setupWebToolsEventListeners();
     this.initialize();
   }
 
   initializeElements() {
     this.elements = {
       connect: document.getElementById('connect'),
-      flashFirmware: document.getElementById('flashFirmware'),
-      progressBar: document.getElementById('progressBar'),
+      flashProgressBar: document.getElementById('flashProgressBar'),
       connectionStatus: document.getElementById('connectionStatus'),
       flashStatus: document.getElementById('flashStatus'),
       console: document.getElementById('console'),
@@ -395,7 +422,6 @@ class ESP32Controller {
 
   setupEventListeners() {
     this.elements.connect.addEventListener('click', () => this.handleConnect());
-    this.elements.flashFirmware.addEventListener('click', () => this.handleFlash());
     this.elements.sendSettings.addEventListener('click', () => this.handleSendSettings());
     this.elements.showSettings.addEventListener('click', () => this.sendCommand('SHOW'));
     this.elements.loadSettings.addEventListener('click', () => this.sendCommand('LOAD'));
@@ -409,19 +435,91 @@ class ESP32Controller {
     window.addEventListener('beforeunload', () => this.disconnect());
   }
 
-  initialize() {
-    this.log('ESP32 Flash & Control готовий до роботи!', 'success');
+  setupWebToolsEventListeners() {
+    const installButton = document.querySelector('esp-web-install-button');
     
-    if (!navigator.serial) {
-      this.log('Web Serial API не підтримується', 'error');
-      this.log('Використовуйте Chrome 89+ або Edge 89+', 'warning');
-      this.showStatus('connectionStatus', 'Браузер не підтримує Web Serial API, спробуйте Google Chrome чи Microsoft Edge', 'error', 0);
-    } else {
-      this.log('Підключіть ESP32 через USB та натисніть "Підключити"', 'info');
+    if (installButton) {
+      installButton.addEventListener('state-changed', (event) => {
+        const state = event.detail.state;
+        
+        switch (state) {
+          case 'CONNECTING':
+            this.logConsole('Підключення до ESP32 для прошивки...', 'warning');
+            this.showStatus('flashStatus', 'Підключення до ESP32...', 'warning', 0);
+            this.showFlashProgress();
+            break;
+            
+          case 'CONNECTED':
+            this.logConsole('ESP32 підключений, розпочинається прошивка', 'success');
+            this.showStatus('flashStatus', 'ESP32 підключений', 'success', 0);
+            break;
+            
+          case 'PREPARING':
+            this.logConsole('Підготовка до прошивки...', 'warning');
+            this.showStatus('flashStatus', 'Підготовка до прошивки...', 'warning', 0);
+            this.updateFlashProgress(10, 'Підготовка...');
+            break;
+            
+          case 'ERASING':
+            this.logConsole('Очищення пам\'яті ESP32...', 'warning');
+            this.showStatus('flashStatus', 'Очищення пам\'яті ESP32...', 'warning', 0);
+            this.updateFlashProgress(25, 'Очищення пам\'яті...');
+            break;
+            
+          case 'WRITING':
+            this.logConsole('Запис прошивки на ESP32...', 'info');
+            this.showStatus('flashStatus', 'Запис прошивки...', 'warning', 0);
+            this.updateFlashProgress(50, 'Запис прошивки...');
+            break;
+            
+          case 'FINISHED':
+            this.logConsole('Прошивка завершена успішно!', 'success');
+            this.showStatus('flashStatus', 'Прошивка завершена успішно!', 'success');
+            this.showToast('ESP32 успішно прошитий! Тепер можете підключитися для налаштувань.', 'success');
+            this.updateFlashProgress(100, 'Прошивка завершена!');
+            this.hideFlashProgress();
+            break;
+            
+          case 'ERROR':
+            this.logConsole('Помилка під час прошивки!', 'error');
+            this.showStatus('flashStatus', 'Помилка прошивки!', 'error');
+            this.showToast('Помилка під час прошивки. Перевірте підключення та спробуйте ще раз.', 'error', 8000);
+            this.hideFlashProgress();
+            break;
+            
+          case 'DISCONNECTED':
+            this.logConsole('ESP32 відключений від прошивки', 'warning');
+            break;
+        }
+      });
+
+      installButton.addEventListener('progress', (event) => {
+        const percentage = event.detail.percentage;
+        const description = event.detail.description || 'Обробка...';
+        
+        if (percentage) {
+          this.logConsole(`Прогрес прошивки: ${percentage}%`, 'info');
+          this.updateFlashProgress(percentage, `${description} (${percentage}%)`);
+        }
+      });
     }
   }
 
-  log(msg, type = 'info') {
+  initialize() {
+    this.logConsole('Панель керування ESP32 готова до роботи!', 'success');
+    this.logConsole('Спочатку прошийте контролер, потім підключіться для налаштувань', 'info');
+    
+    if (!navigator.serial) {
+      this.logConsole('Web Serial API не підтримується', 'error');
+      this.showToast('Використовуйте Chrome або Edge браузер', 'error', 8000);
+    }
+
+    if (customElements.get('esp-web-install-button')) {
+      this.logConsole('ESP Web Tools готовий для прошивки', 'success');
+    }
+  }
+
+  logConsole(msg, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     const colors = {
       info: '#eee',
@@ -469,6 +567,21 @@ class ESP32Controller {
     }, duration);
   }
 
+  showFlashProgress() {
+    document.querySelector('.flash-progress').style.display = 'block';
+  }
+
+  hideFlashProgress() {
+    setTimeout(() => {
+      document.querySelector('.flash-progress').style.display = 'none';
+    }, 3000);
+  }
+
+  updateFlashProgress(percent, text) {
+    this.elements.flashProgressBar.style.width = `${percent}%`;
+    this.elements.flashProgressBar.textContent = text;
+  }
+
   async handleConnect() {
     try {
       if (this.port && this.port.readable) {
@@ -477,17 +590,16 @@ class ESP32Controller {
       }
 
       if (!navigator.serial) {
-        this.log('Web Serial API не підтримується цим браузером', 'error');
-        this.showToast('Використовуйте Chrome або Edge для підключення', 'error');
+        this.showToast('Web Serial API не підтримується. Використовуйте Chrome або Edge.', 'error');
         return;
       }
 
-      this.log('Відкриття діалогу вибору порту...', 'info');
-      this.showStatus('connectionStatus', 'Оберіть порт до якого підключена мапа', 'warning', 0);
+      this.logConsole('Відкриття діалогу вибору порту...', 'info');
+      this.showStatus('connectionStatus', 'Оберіть порт контролера', 'warning', 0);
       
       this.port = await navigator.serial.requestPort();
 
-      this.log('Підключення до обраного порту...', 'info');
+      this.logConsole('Підключення до контролера...', 'info');
       await this.port.open({ 
         baudRate: 115200,
         dataBits: 8,
@@ -496,14 +608,12 @@ class ESP32Controller {
         flowControl: 'none'
       });
 
-      const portInfo = this.port.getInfo();
-      this.log(`Інформація про порт: VID=${portInfo.usbVendorId?.toString(16)}, PID=${portInfo.usbProductId?.toString(16)}`, 'info');
-
       this.writer = this.port.writable.getWriter();
       this.reader = this.port.readable.getReader();
       
-      this.log('Успішно підключено до ESP32!', 'success');
-      this.showStatus('connectionStatus', 'Підключено до контролера мапи', 'success');
+      this.logConsole('Успішно підключено до контролера!', 'success');
+      this.showStatus('connectionStatus', 'Підключено до контролера', 'success');
+      this.showToast('Підключення встановлено!', 'success');
       this.elements.connect.textContent = 'Від\'єднати';
       
       setTimeout(() => {
@@ -513,10 +623,10 @@ class ESP32Controller {
       this.readLoop();
     } catch (e) {
       if (e.name === 'NotFoundError') {
-        this.log('Порт не обрано або Контролер не знайдено', 'warning');
-        this.showToast('Порт не обрано або Контролер не знайдено', 'warning');
+        this.logConsole('Порт не обрано', 'warning');
+        this.showToast('Порт не обрано', 'warning');
       } else {
-        this.log(`Помилка підключення: ${e.message}`, 'error');
+        this.logConsole(`Помилка підключення: ${e.message}`, 'error');
         this.showToast(`Помилка підключення: ${e.message}`, 'error');
       }
     }
@@ -538,11 +648,11 @@ class ESP32Controller {
         this.port = null;
       }
       
-      this.log('Відключено від ESP32', 'warning');
+      this.logConsole('Відключено від контролера', 'warning');
       this.showStatus('connectionStatus', 'Відключено', 'warning', 3000);
-      this.elements.connect.textContent = 'Підключити до ESP32';
+      this.elements.connect.textContent = 'Підключитися до контролера';
     } catch (e) {
-      this.log(`Помилка відключення: ${e.message}`, 'error');
+      this.logConsole(`Помилка відключення: ${e.message}`, 'error');
     }
   }
 
@@ -557,105 +667,32 @@ class ESP32Controller {
           const lines = text.split(/[\r\n]+/);
           lines.forEach(line => {
             if (line.trim()) {
-              this.log(`📨 ${line.trim()}`, 'info');
+              this.logConsole(`📨 ${line.trim()}`, 'info');
             }
           });
         }
       }
     } catch (e) {
       if (!e.message.includes('canceled')) {
-        this.log(`Помилка читання: ${e.message}`, 'error');
+        this.logConsole(`Помилка читання: ${e.message}`, 'error');
       }
     }
   }
 
   async sendCommand(cmd) {
     if (!this.writer) {
-      this.log('Не підключено до ESP32', 'error');
+      this.showToast('Спочатку підключіться до контролера!', 'error');
       return false;
     }
     
     try {
       await this.writer.write(new TextEncoder().encode(cmd + '\n'));
-      this.log(`📤 ${cmd}`, 'success');
+      this.logConsole(`📤 ${cmd}`, 'success');
       return true;
     } catch (e) {
-      this.log(`Помилка відправки команди: ${e.message}`, 'error');
+      this.logConsole(`Помилка відправки команди: ${e.message}`, 'error');
       return false;
     }
-  }
-
-  async handleFlash() {
-    if (!this.port) {
-      this.showToast('Спочатку підключіться до мапи', 'error');
-      return;
-    }
-
-    try {
-      this.isFlashing = true;
-      this.elements.flashFirmware.disabled = true;
-      
-      this.log('Початок прошивки файлу: firmware.bin', 'warning');
-      this.showStatus('flashStatus', 'Завантаження firmware.bin...', 'warning', 0);
-      
-      document.querySelector('.progress-container').style.display = 'block';
-      this.updateProgress(0, 'Завантаження файлу...');
-
-      const response = await fetch('firmware.bin');
-      if (!response.ok) {
-        throw new Error(`Файл firmware.bin не знайдено. Код помилки: ${response.status}`);
-      }
-      
-      const firmwareData = await response.arrayBuffer();
-      this.log(`Файл firmware.bin завантажено: ${(firmwareData.byteLength / 1024).toFixed(1)} KB`, 'info');
-      
-      this.updateProgress(20, 'Перевід в режим прошивки...');
-      await this.enterBootloaderMode();
-      
-      await this.simulateFlashing(firmwareData);
-      
-      this.log('Прошивка завершена успішно!', 'success');
-      this.showStatus('flashStatus', 'Прошивка завершена успішно!', 'success');
-      this.showToast('Прошивка завершена успішно!', 'success');
-      this.updateProgress(100, 'Завершено!');
-      
-      setTimeout(async () => {
-        this.log('Перезапуск ESP32...', 'warning');
-        await this.sendCommand('RESTART');
-        document.querySelector('.progress-container').style.display = 'none';
-      }, 2000);
-
-    } catch (e) {
-      this.log(`Помилка прошивки: ${e.message}`, 'error');
-      this.showStatus('flashStatus', `Помилка: ${e.message}`, 'error');
-      this.showToast(`Помилка прошивки: ${e.message}`, 'error', 7000);
-      document.querySelector('.progress-container').style.display = 'none';
-    } finally {
-      this.isFlashing = false;
-      this.elements.flashFirmware.disabled = false;
-    }
-  }
-
-  async enterBootloaderMode() {
-    this.log('Перевід ESP32 в режим завантажувача...', 'warning');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    this.log('ESP32 готовий до прошивки', 'info');
-  }
-
-  async simulateFlashing(firmwareData) {
-    const totalSize = firmwareData.byteLength;
-    
-    for (let i = 1; i <= 8; i++) {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      const percent = 20 + (i * 10);
-      const bytesWritten = Math.min((totalSize / 8) * i, totalSize);
-      this.updateProgress(percent, `Запис: ${(bytesWritten / 1024).toFixed(1)}KB / ${(totalSize / 1024).toFixed(1)}KB`);
-    }
-  }
-
-  updateProgress(percent, text) {
-    this.elements.progressBar.style.width = `${percent}%`;
-    this.elements.progressBar.textContent = text;
   }
 
   async handleSendSettings() {
@@ -668,19 +705,19 @@ class ESP32Controller {
     const colorA = this.elements.colorA.value.replace('#','').toUpperCase();
 
     if (!ssid) {
-      this.showToast('Введіть SSID мережі!', 'error');
+      this.showToast('Введіть назву мережі Wi-Fi!', 'error');
       return;
     }
 
     if (!this.port) {
-      this.showToast('Підключіться до ESP32!', 'error');
+      this.showToast('Спочатку підключіться до контролера!', 'error');
       return;
     }
 
-    this.log('Відправка налаштувань...', 'info');
+    this.logConsole('Відправка налаштувань на контролер...', 'info');
     
     const commands = [
-      `SET WIFI ${ssid} ${pass}`,
+      `SET WIFI "${ssid}" "${pass}"`,
       `SET BRIGHTNESS ${brightness}`,
       `SET COLORN ${colorN}`,
       `SET COLORP ${colorP}`,
@@ -693,20 +730,20 @@ class ESP32Controller {
       await new Promise(resolve => setTimeout(resolve, 200));
     }
     
-    this.log('Налаштування відправлені', 'success');
-    this.showToast('Налаштування успішно збережені!', 'success');
+    this.logConsole('Налаштування успішно збережені', 'success');
+    this.showToast('Налаштування збережені на контролері!', 'success');
   }
 
   async handleRestart() {
     if (await this.sendCommand('RESTART')) {
-      this.log('Команда перезапуску відправлена', 'warning');
-      this.showStatus('connectionStatus', 'Перезапуск ESP32...', 'warning', 3000);
+      this.logConsole('Команда перезапуску відправлена', 'warning');
+      this.showToast('Контролер перезапускається...', 'info');
     }
   }
 
   clearConsole() {
     this.elements.console.innerHTML = '';
-    this.log('Консоль очищена', 'info');
+    this.logConsole('Консоль очищена', 'info');
   }
 }
 
